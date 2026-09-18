@@ -69,7 +69,7 @@ ggplot(filter(p,type=="reported"),
   labs(x="Month",y="Total snowfall during month")
 ```
 
-```{r model,warning=F,message=F}
+```{r model_lm,warning=F,message=F}
 #Get effect size at average month
 contrasts(p$month_fct) <- contr.sum(nlevels(p$month_fct))
 
@@ -80,7 +80,7 @@ summary(pothole_mod)
 ```
 
 
-```{r model,warning=F,message=F}
+```{r model_glm,warning=F,message=F}
 pothole_mod_glm <- glm(n ~ mamdani + month_n + month_fct,
                    family = "poisson",
    data = p[p$type == "closed",])
@@ -91,14 +91,14 @@ summary(pothole_mod_glm)
 ```
 
 
-```{r model,warning=F,message=F}
-pothole_mod_snow <- glm(n ~ mamdani + month_n + month_fct + snow + snow_lag1 + snow_lag2 + snow_lag3 + snow_lag4 + snow_lag5 + snow_lag6,
+```{r model_glm_snow,warning=F,message=F}
+pothole_mod_glm_snow <- glm(n ~ mamdani + month_n + month_fct + snow + snow_lag1 + snow_lag2 + snow_lag3 + snow_lag4 + snow_lag5 + snow_lag6,
                    family = "poisson",
    data = p[p$type == "closed",])
 
-summary(pothole_mod_snow)
+summary(pothole_mod_glm_snow)
 
-(exp(coef(pothole_mod_snow)["mamdaniTRUE"]) - 1) * 100
+(exp(coef(pothole_mod_glm_snow)["mamdaniTRUE"]) - 1) * 100
 
 ```
 
