@@ -10,6 +10,10 @@ library(tidyverse)
 
 potholes <- read_csv("Street_Pothole_Work_Orders_-_Closed_(Dataset)_20260918.csv")
 
+NOAA_precip_data <- read_csv("NOAA_precip_data.csv") %>%
+  mutate(month = ym(DATE)) %>%
+  select(month,snow = SNOW)
+
 p <- potholes %>%
   transmute(closed = floor_date(ymd_hms(RptClosed), unit = "months"),
          reported = floor_date(ymd_hms(RptDate), unit = "months"),
@@ -20,12 +24,21 @@ p <- potholes %>%
   group_by(type,month) %>%
   summarise(n = n(),
             avg_delay = mean(delay)) %>%
-  filter(month >= ymd("20160101")) %>%
+  left_join(NOAA_precip_data, by = "month") %>%
   ungroup() %>%
   mutate(mamdani = year(month) == 2026,
          month_fct = month(month,label = T),
          # Set January 2026 as reference for intercept estimate
-         month_n = interval(ymd("20260101"), month) %/% months(1))
+         month_n = interval(ymd("20260101"), month) %/% months(1)) %>%
+  group_by(type) %>%
+  mutate(,
+    snow_lag1 = lag(snow, 1),
+    snow_lag2 = lag(snow, 2),
+    snow_lag3 = lag(snow, 3),
+    snow_lag4 = lag(snow, 4),
+    snow_lag5 = lag(snow, 5),
+    snow_lag6 = lag(snow, 6)) %>%
+  filter(month >= ymd("20160101"))
 ```
 
 
@@ -46,6 +59,15 @@ ggplot(filter(p,type=="reported"),
   labs(x="Month",y="Average days to fix")
 ```
 
+# Snowfall
+
+```{r fig_snow,warning=F,message=F}
+ggplot(filter(p,type=="reported"),
+       aes(x=month,y=snow)) +
+  #facet_wrap(~Boro,ncol = 1) +
+  geom_line(linewidth = 1) +
+  labs(x="Month",y="Total snowfall during month")
+```
 
 ```{r model,warning=F,message=F}
 #Get effect size at average month
@@ -55,5 +77,28 @@ pothole_mod <- lm(n ~ mamdani + month_n + month_fct,
    data = p[p$type == "closed",])
 
 summary(pothole_mod)
+```
+
+
+```{r model,warning=F,message=F}
+pothole_mod_glm <- glm(n ~ mamdani + month_n + month_fct,
+                   family = "poisson",
+   data = p[p$type == "closed",])
+
+summary(pothole_mod_glm)
+
+(exp(coef(pothole_mod_glm)["mamdaniTRUE"]) - 1) * 100
+```
+
+
+```{r model,warning=F,message=F}
+pothole_mod_snow <- glm(n ~ mamdani + month_n + month_fct + snow + snow_lag1 + snow_lag2 + snow_lag3 + snow_lag4 + snow_lag5 + snow_lag6,
+                   family = "poisson",
+   data = p[p$type == "closed",])
+
+summary(pothole_mod_snow)
+
+(exp(coef(pothole_mod_snow)["mamdaniTRUE"]) - 1) * 100
 
 ```
+
