@@ -1,0 +1,59 @@
+---
+title: "Untitled"
+author: "dspaced"
+date: "2026-09-18"
+output: html_document
+---
+
+```{r setup,warning=F,message=F}
+library(tidyverse)
+
+potholes <- read_csv("Street_Pothole_Work_Orders_-_Closed_(Dataset)_20260918.csv")
+
+p <- potholes %>%
+  transmute(closed = floor_date(ymd_hms(RptClosed), unit = "months"),
+         reported = floor_date(ymd_hms(RptDate), unit = "months"),
+         delay = difftime(ymd_hms(RptClosed),ymd_hms(RptDate),units = "days")) %>%
+  pivot_longer(-delay,
+               names_to = "type",
+               values_to = "month") %>%
+  group_by(type,month) %>%
+  summarise(n = n(),
+            avg_delay = mean(delay)) %>%
+  filter(month >= ymd("20160101")) %>%
+  ungroup() %>%
+  mutate(mamdani = year(month) == 2026,
+         month_fct = month(month,label = T),
+         # Set January 2026 as reference for intercept estimate
+         month_n = interval(ymd("20260101"), month) %/% months(1))
+```
+
+
+```{r fig_n,warning=F,message=F}
+ggplot(p,
+       aes(x=month,y=n,color=type)) +
+  #facet_wrap(~Boro,ncol = 1) +
+  geom_line(linewidth = 1) +
+  labs(x="Month",y="Number of potholes reported/fixed")
+```
+
+
+```{r fig_delay,warning=F,message=F}
+ggplot(filter(p,type=="reported"),
+       aes(x=month,y=avg_delay)) +
+  #facet_wrap(~Boro,ncol = 1) +
+  geom_line(linewidth = 1) +
+  labs(x="Month",y="Average days to fix")
+```
+
+
+```{r model,warning=F,message=F}
+#Get effect size at average month
+contrasts(p$month_fct) <- contr.sum(nlevels(p$month_fct))
+
+pothole_mod <- lm(n ~ mamdani + month_n + month_fct,
+   data = p[p$type == "closed",])
+
+summary(pothole_mod)
+
+```
